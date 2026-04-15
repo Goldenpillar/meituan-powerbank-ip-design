@@ -297,3 +297,260 @@
 | 光轨层次 | 主轨5条+辅轨8条，层次分明 |
 | 城市轮廓 | 抽象风格，不具象化 |
 | 整体视觉 | 美观、动感、品牌识别度高 |
+
+---
+
+## 技术实现指南
+
+### 技术栈
+
+本项目采用 **Python + AI生图 + SVG** 混合技术路线：
+
+| 层级 | 技术 | 负责内容 |
+|------|------|---------|
+| 背景层 | GenerateImage (AI生图) | 光绘效果纹理、城市氛围背景 |
+| 装饰层 | Python svgwrite + cairosvg | 光轨线条、城市轮廓、能量发射口 |
+| 品牌层 | Python Pillow + qrcode | Logo、QR码、"此方向归还"文字 |
+| 合成层 | Python Pillow | 图层合成、尺寸控制、300dpi输出 |
+| 3D展示 | GenerateImage (3D render prompt) | 产品渲染图、场景效果图 |
+
+### 环境准备
+
+```bash
+pip install Pillow svgwrite cairosvg qrcode --break-system-packages
+```
+
+### 实现步骤
+
+#### Step 1: AI生成创意背景
+
+使用GenerateImage工具生成光绘效果背景：
+
+**正面背景**：
+- prompt: "Product design background, vibrant Meituan yellow #FFC600 base color, with abstract light painting trails in dark color flowing upward, long exposure photography style, dynamic light streaks, subtle urban cityscape silhouette at top, energetic and modern, clean design, 4k quality, suitable as product surface background"
+- size: 1430x710 (10x = 300dpi equivalent)
+- 保存为: outputs/powerbank/bg_front.png
+
+**背面背景**：
+- prompt: "Vibrant Meituan yellow #FFC600 base color, abstract light painting trails converging toward bottom center, energy burst effect, dynamic light streaks in dark color, long exposure photography aesthetic, clean design, 4k quality"
+- size: 1430x710
+- 保存为: outputs/powerbank/bg_back.png
+
+**机柜背景**：
+- prompt: "Product kiosk surface design background, bright Meituan yellow #FFC600 base with flowing light trail network pattern in dark lines connecting circular station nodes, modern smart city aesthetic, vertical orientation, clean and professional, 4k quality"
+- size: 2500x3600
+- 保存为: outputs/cabinet/bg_cabinet.png
+
+#### Step 2: SVG绘制矢量装饰元素
+
+创建Python脚本 `generate_decorations.py`，使用svgwrite绘制：
+
+**正面装饰元素**：
+- 5条主光轨（从底部向上流动的弧线，宽度30-40px）
+- 8条辅光轨（装饰性流动线条，宽度15-20px）
+- 抽象城市天际线轮廓（高度300-400px，位于中上部）
+- 光轨发光效果（浅黄色半透明叠加层）
+
+**背面装饰元素**：
+- 多条光轨从四周向三线出口区域汇聚
+- 能量发射口（放射状光线效果）
+- 汇聚点发光效果
+
+**机柜装饰元素**：
+- 光轨网络连接线（连接12个站点）
+- 站点圆形图标（3种状态：可用/充电中/空置）
+- 城市天际线装饰带（底部）
+
+脚本模板：
+```python
+import svgwrite
+import cairosvg
+import math
+
+def generate_front_decorations():
+    dwg = svgwrite.Drawing('deco_front.svg', size=('1430px', '710px'))
+
+    # 主光轨 - 5条从底部向上流动的弧线
+    # 使用path元素绘制贝塞尔曲线
+    for i in range(5):
+        start_x = 200 + i * 260
+        # 创建从底部到上方的流动弧线
+        path_data = f"M {start_x} 710 C {start_x-50} 500, {start_x+30} 300, {start_x-20} 100"
+        dwg.add(dwg.path(d=path_data,
+                        stroke='#1A1A1A', stroke_width='35',
+                        stroke_opacity='0.7', fill='none',
+                        stroke_linecap='round'))
+
+    # 辅光轨 - 8条装饰性线条
+    for i in range(8):
+        start_x = 100 + i * 170
+        path_data = f"M {start_x} 710 C {start_x+40} 550, {start_x-30} 350, {start_x+20} 150"
+        dwg.add(dwg.path(d=path_data,
+                        stroke='#1A1A1A', stroke_width='18',
+                        stroke_opacity='0.4', fill='none',
+                        stroke_linecap='round'))
+
+    # 光轨发光效果 - 浅黄色半透明叠加
+    for i in range(5):
+        start_x = 200 + i * 260
+        path_data = f"M {start_x} 710 C {start_x-50} 500, {start_x+30} 300, {start_x-20} 100"
+        dwg.add(dwg.path(d=path_data,
+                        stroke='#FFF3CD', stroke_width='50',
+                        stroke_opacity='0.3', fill='none',
+                        stroke_linecap='round'))
+
+    # 抽象城市天际线轮廓 - 中上部
+    city_path = "M 0 250 L 80 250 L 80 200 L 120 200 L 120 180 L 160 180 L 160 220 L 220 220 L 220 160 L 280 160 L 280 190 L 350 190 L 350 170 L 420 170 L 420 210 L 500 210 L 500 150 L 560 150 L 560 200 L 630 200 L 630 180 L 700 180 L 700 230 L 780 230 L 780 170 L 850 170 L 850 200 L 920 200 L 920 160 L 1000 160 L 1000 190 L 1070 190 L 1070 210 L 1150 210 L 1150 180 L 1220 180 L 1220 220 L 1300 220 L 1300 250 L 1430 250 Z"
+    dwg.add(dwg.path(d=city_path,
+                    fill='#2A2A2A', fill_opacity='0.6',
+                    stroke='none'))
+
+    dwg.save()
+    cairosvg.svg2png(url='deco_front.svg', write_to='deco_front.png',
+                     output_width=1430, output_height=710)
+
+generate_front_decorations()
+```
+
+#### Step 3: 生成品牌元素
+
+创建Python脚本 `generate_brand_elements.py`：
+
+```python
+from PIL import Image, ImageDraw, ImageFont
+import qrcode
+
+def generate_qrcode():
+    """生成QR码 220x220px (22mm @300dpi * 10)"""
+    qr = qrcode.QRCode(version=2, box_size=10, border=2)
+    qr.add_data("https://i.meituan.com/awp/h5/charger/index.html")
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="#1A1A1A", back_color="white")
+    img = img.resize((220, 220))
+    img.save('qrcode.png')
+
+def generate_return_hint():
+    """生成"此方向归还"提示 400x60px"""
+    img = Image.new('RGBA', (400, 60), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 24)
+    except:
+        font = ImageFont.load_default()
+    draw.text((80, 15), "此方向归还 ↑", fill="white", font=font)
+    img.save('return_hint.png')
+
+def generate_meituan_logo():
+    """生成美团Logo占位 200x200px"""
+    img = Image.new('RGBA', (200, 200), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    draw.rounded_rectangle([(10, 10), (190, 190)], radius=30,
+                          fill=(255, 198, 0, 255))
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 48)
+    except:
+        font = ImageFont.load_default()
+    bbox = draw.textbbox((0, 0), "美团", font=font)
+    w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    draw.text(((200 - w) // 2, (200 - h) // 2 - 10), "美团",
+              fill=(26, 26, 26, 255), font=font)
+    img.save('meituan_logo.png')
+
+generate_qrcode()
+generate_return_hint()
+generate_meituan_logo()
+```
+
+#### Step 4: Pillow合成最终设计
+
+创建Python脚本 `compose_final.py`：
+
+```python
+from PIL import Image, ImageDraw, ImageFont
+
+def compose_powerbank_front():
+    """合成充电宝正面 1430x710px @10x = 300dpi"""
+    canvas = Image.open('bg_front.png').resize((1430, 710))
+
+    # 叠加SVG装饰层
+    deco = Image.open('deco_front.png').resize((1430, 710))
+    canvas = Image.alpha_composite(canvas.convert('RGBA'), deco.convert('RGBA'))
+
+    # 放置美团Logo - 中心偏上，带美团黄背景确保可见
+    logo = Image.open('meituan_logo.png')
+    logo_pos = ((1430 - 200) // 2, 160)
+    canvas.paste(logo, logo_pos, logo)
+
+    # 放置QR码 - 中心偏下，确保周围留白
+    qr = Image.open('qrcode.png')
+    qr_pos = ((1430 - 220) // 2, 400)
+    # 在QR码周围添加白色背景确保可扫描
+    from PIL import Image as PILImage
+    qr_bg = PILImage.new('RGBA', (260, 260), (255, 255, 255, 255))
+    qr_bg.paste(qr, ((260-220)//2, (260-220)//2), qr)
+    canvas.paste(qr_bg, (qr_pos[0]-20, qr_pos[1]-20), qr_bg)
+
+    # 放置"此方向归还" - 顶部居中
+    hint = Image.open('return_hint.png')
+    hint_pos = ((1430 - 400) // 2, 20)
+    canvas.paste(hint, hint_pos, hint)
+
+    # 放置加盟合作文字
+    draw = ImageDraw.Draw(canvas)
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 16)
+    except:
+        font = ImageFont.load_default()
+    draw.text(((1430 - 280) // 2, 650), "加盟合作 | 更多福利 | 扫码领取",
+              fill="white", font=font)
+
+    canvas.convert('RGB').save('GGXN_powerbank_front_v1.0.0.png', dpi=(300, 300))
+    print("✅ 充电宝正面完成")
+
+compose_powerbank_front()
+```
+
+#### Step 5: AI生成3D展示效果图
+
+使用GenerateImage工具生成3D产品渲染图：
+
+**充电宝3D渲染**：
+- prompt: "Professional 3D product photography render of a portable power bank charger, sleek rounded rectangular design, vibrant Meituan yellow surface with dynamic dark light painting trails flowing upward creating an abstract city skyline silhouette, studio soft box lighting, subtle reflections on glossy surface, white clean background, photorealistic, 8k resolution, product design portfolio, commercial photography"
+- size: 1024x1024
+- 保存为: outputs/powerbank/GGXN_powerbank_3d_render.png
+
+**机柜3D渲染**：
+- prompt: "3D architectural visualization render of a modern power bank charging station kiosk, standing vertically, bright Meituan yellow themed surface with dark light trail network connecting circular station nodes, clean modern design, placed in a busy urban shopping street environment with people walking by, realistic materials, professional architectural viz style, 8k"
+- size: 768x1024
+- 保存为: outputs/cabinet/GGXN_cabinet_3d_render.png
+
+**场景效果图**：
+- prompt: "A stylish power bank charging station with vibrant yellow color and dynamic light trail design, placed in a busy modern city street at dusk with warm golden hour lighting, young people using phones and interacting with the station, cinematic urban lifestyle photography, shallow depth of field, professional commercial quality, 8k"
+- size: 1280x720
+- 保存为: outputs/GGXN_scene_render.png
+
+### 文件输出清单
+
+| 序号 | 文件名 | 说明 |
+|------|--------|------|
+| 1 | GGXN_powerbank_front_v1.0.0.png | 充电宝正面（2D印刷级） |
+| 2 | GGXN_powerbank_back_v1.0.0.png | 充电宝背面（2D印刷级） |
+| 3 | GGXN_cabinet_front_v1.0.0.png | 机柜正面（2D印刷级） |
+| 4 | GGXN_powerbank_3d_render.png | 充电宝3D产品渲染图 |
+| 5 | GGXN_cabinet_3d_render.png | 机柜3D场景渲染图 |
+| 6 | GGXN_scene_render.png | 终端场景效果图 |
+| 7 | GGXN_设计说明_v1.0.0.md | 设计说明文档 |
+| 8 | generate_*.py | Python源脚本（可复现） |
+
+### 执行顺序
+
+```
+1. 安装依赖 → pip install Pillow svgwrite cairosvg qrcode
+2. AI生成背景 → GenerateImage × 3 (正面/背面/机柜)
+3. SVG绘制装饰 → generate_decorations.py
+4. 生成品牌元素 → generate_brand_elements.py
+5. 合成最终设计 → compose_final.py
+6. AI生成3D图 → GenerateImage × 3 (产品/机柜/场景)
+7. 编写设计说明 → GGXN_设计说明_v1.0.0.md
+8. Git提交推送
+```
